@@ -1,0 +1,58 @@
+config {
+  type: "table",
+  schema: "analytics_491835993",
+  name: "wisepops_schema",
+
+  description: "Production WisePops compatibility table backed by the validated Dataform GA4 staging layer. Preserves the legacy reporting table name and schema.",
+
+  bigquery: {
+  partitionBy: "event_date",
+  clusterBy: [
+    "user_pseudo_id",
+    "ga_session_id",
+    "event_name"
+  ]
+},
+
+  assertions: {
+    nonNull: [
+      "event_date",
+      "event_timestamp",
+      "event_name"
+    ],
+
+    rowConditions: [
+      "event_name IN ('banner_impression', 'wisepops_popup_click')",
+      "impression IN (0, 1)",
+      "click IN (0, 1)",
+      "impression + click = 1"
+    ]
+  }
+}
+
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  user_pseudo_id,
+  ga_session_id,
+  session_id,
+  page_location,
+  page_referrer,
+  page_title,
+
+  CAST(NULL AS INT64) AS page_index,
+  CAST(NULL AS STRING) AS next_page_location,
+  CAST(NULL AS INT64) AS ce_page_counter,
+
+  impression,
+  click,
+
+  CAST(NULL AS STRING) AS popup_type,
+  CAST(NULL AS STRING) AS segment,
+  CAST(NULL AS FLOAT64) AS segment_score,
+  CAST(NULL AS STRING) AS match_game,
+  CAST(NULL AS STRING) AS match_url,
+  CAST(NULL AS STRING) AS click_id
+
+FROM ${ref("dataform", "stg_wisepops_ga4_events")}
