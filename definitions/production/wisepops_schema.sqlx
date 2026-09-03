@@ -31,7 +31,6 @@ config {
 }
 
 SELECT
-
   event_date,
   event_timestamp,
   event_name,
