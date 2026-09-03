@@ -3,7 +3,7 @@ config {
   schema: "dataform",
   name: "stg_wisepops_ga4_events",
 
-  description: "GA4 staging table for WisePops banner impressions and popup clicks.",
+  description: "Validated GA4 event-level staging table for WisePops banner impressions and popup clicks.",
 
   bigquery: {
     partitionBy: "event_date",
@@ -32,14 +32,9 @@ config {
 
 SELECT
 
-  PARSE_DATE(
-    '%Y%m%d',
-    e.event_date
-  ) AS event_date,
+  PARSE_DATE('%Y%m%d', e.event_date) AS event_date,
 
-  TIMESTAMP_MICROS(
-    e.event_timestamp
-  ) AS event_timestamp,
+  TIMESTAMP_MICROS(e.event_timestamp) AS event_timestamp,
 
   e.event_name,
 
@@ -111,7 +106,7 @@ WHERE
   AND PARSE_DATE(
     '%Y%m%d',
     e.event_date
-  ) >= DATE('2026-08-01')
+  ) >= DATE('2025-12-12')
 
   AND e.event_name IN (
     'banner_impression',
