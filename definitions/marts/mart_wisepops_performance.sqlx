@@ -1,0 +1,110 @@
+config {
+  type: "table",
+  schema: "dataform",
+  name: "mart_wisepops_performance",
+
+  description: "Business-facing daily WisePops performance mart built from the validated GA4 WisePops staging layer. Grain: one row per event date and normalized page URL.",
+
+  bigquery: {
+    partitionBy: "event_date",
+    clusterBy: ["page_location"]
+  },
+
+  assertions: {
+    uniqueKey: [
+      "event_date",
+      "page_location"
+    ],
+
+    nonNull: [
+      "event_date",
+      "page_location",
+      "impressions",
+      "clicks"
+    ],
+
+    rowConditions: [
+      "impressions >= 0",
+      "clicks >= 0",
+      "total_events = impressions + clicks"
+    ]
+  }
+}
+
+WITH source AS (
+
+  SELECT
+    event_date,
+    event_timestamp,
+    event_name,
+    page_title,
+
+    CASE
+      WHEN page_location IS NULL
+        OR TRIM(page_location) = ''
+      THEN '(unknown)'
+
+      ELSE REGEXP_REPLACE(
+        REGEXP_REPLACE(
+          TRIM(page_location),
+          r'[?#].*$',
+          ''
+        ),
+        r'/$',
+        ''
+      )
+    END AS page_location,
+
+    impression,
+    click
+
+  FROM ${ref("stg_wisepops_ga4_events")}
+
+),
+
+aggregated AS (
+
+  SELECT
+    event_date,
+    page_location,
+
+    SUM(impression) AS impressions,
+    SUM(click) AS clicks,
+
+    SUM(impression) + SUM(click) AS total_events,
+
+    SAFE_DIVIDE(
+      SUM(click),
+      SUM(impression)
+    ) AS click_to_impression_ratio,
+
+    MIN(event_timestamp) AS first_event_timestamp,
+    MAX(event_timestamp) AS last_event_timestamp,
+
+    ARRAY_AGG(
+      page_title
+      IGNORE NULLS
+      ORDER BY event_timestamp DESC
+      LIMIT 1
+    )[SAFE_OFFSET(0)] AS page_title
+
+  FROM source
+
+  GROUP BY
+    event_date,
+    page_location
+
+)
+
+SELECT
+  event_date,
+  page_location,
+  page_title,
+  impressions,
+  clicks,
+  total_events,
+  click_to_impression_ratio,
+  first_event_timestamp,
+  last_event_timestamp
+
+FROM aggregated
