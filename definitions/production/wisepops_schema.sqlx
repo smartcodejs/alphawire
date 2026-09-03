@@ -6,12 +6,13 @@ config {
   description: "Production WisePops compatibility table backed by the validated Dataform GA4 staging layer. Preserves the legacy reporting table name and schema.",
 
   bigquery: {
-    partitionBy: "event_date",
-    clusterBy: [
-      "user_pseudo_id",
-      "ga_session_id"
-    ]
-  },
+  partitionBy: "event_date",
+  clusterBy: [
+    "user_pseudo_id",
+    "ga_session_id",
+    "event_name"
+  ]
+},
 
   assertions: {
     nonNull: [
