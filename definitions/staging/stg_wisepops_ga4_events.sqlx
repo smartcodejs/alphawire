@@ -1,0 +1,84 @@
+config {
+  type: "incremental",
+  schema: "dataform",
+  name: "stg_wisepops_ga4_events",
+  bigquery: {
+    partitionBy: "event_date",
+    clusterBy: ["event_name", "user_pseudo_id", "ga_session_id"]
+  },
+  assertions: {
+    nonNull: ["event_date", "event_timestamp", "event_name"],
+    rowConditions: [
+      "event_name IN ('banner_impression', 'wisepops_popup_click')",
+      "impression IN (0, 1)",
+      "click IN (0, 1)",
+      "impression + click = 1"
+    ]
+  }
+}
+
+pre_operations {
+  ${when(
+    incremental(),
+    `DELETE FROM ${self()}
+     WHERE event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)`,
+    ``
+  )}
+}
+
+SELECT
+  PARSE_DATE('%Y%m%d', e.event_date) AS event_date,
+  TIMESTAMP_MICROS(e.event_timestamp) AS event_timestamp,
+  e.event_name,
+  e.user_pseudo_id,
+
+  CAST((
+    SELECT p.value.int_value
+    FROM UNNEST(e.event_params) p
+    WHERE p.key = 'ga_session_id'
+  ) AS STRING) AS ga_session_id,
+
+  CONCAT(
+    CAST(e.user_pseudo_id AS STRING),
+    '-',
+    CAST((
+      SELECT p.value.int_value
+      FROM UNNEST(e.event_params) p
+      WHERE p.key = 'ga_session_id'
+    ) AS STRING)
+  ) AS session_id,
+
+  (
+    SELECT p.value.string_value
+    FROM UNNEST(e.event_params) p
+    WHERE p.key = 'page_location'
+  ) AS page_location,
+
+  (
+    SELECT p.value.string_value
+    FROM UNNEST(e.event_params) p
+    WHERE p.key = 'page_referrer'
+  ) AS page_referrer,
+
+  (
+    SELECT p.value.string_value
+    FROM UNNEST(e.event_params) p
+    WHERE p.key = 'page_title'
+  ) AS page_title,
+
+  IF(e.event_name = 'banner_impression', 1, 0) AS impression,
+  IF(e.event_name = 'wisepops_popup_click', 1, 0) AS click
+
+FROM `alphawire.analytics_491835993.events_*` e
+
+WHERE _TABLE_SUFFIX NOT LIKE 'intraday%'
+  AND e.event_name IN (
+    'banner_impression',
+    'wisepops_popup_click'
+  )
+
+  ${when(
+    incremental(),
+    `AND PARSE_DATE('%Y%m%d', e.event_date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)`,
+    `AND PARSE_DATE('%Y%m%d', e.event_date) >= DATE('2026-08-01')`
+  )}
