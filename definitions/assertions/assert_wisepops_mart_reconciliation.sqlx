@@ -1,0 +1,84 @@
+config {
+  type: "assertion",
+  description: "Ensures WisePops performance mart totals reconcile exactly with the validated staging layer by event date."
+}
+
+WITH staging AS (
+
+  SELECT
+    event_date,
+    SUM(impression) AS staging_impressions,
+    SUM(click) AS staging_clicks,
+    COUNT(*) AS staging_total_events
+
+  FROM ${ref("dataform", "stg_wisepops_ga4_events")}
+
+  GROUP BY
+    event_date
+),
+
+mart AS (
+
+  SELECT
+    event_date,
+    SUM(impressions) AS mart_impressions,
+    SUM(clicks) AS mart_clicks,
+    SUM(total_events) AS mart_total_events
+
+  FROM ${ref("dataform", "mart_wisepops_performance")}
+
+  GROUP BY
+    event_date
+)
+
+SELECT
+
+  COALESCE(
+    s.event_date,
+    m.event_date
+  ) AS event_date,
+
+  IFNULL(
+    s.staging_impressions,
+    0
+  ) AS staging_impressions,
+
+  IFNULL(
+    m.mart_impressions,
+    0
+  ) AS mart_impressions,
+
+  IFNULL(
+    s.staging_clicks,
+    0
+  ) AS staging_clicks,
+
+  IFNULL(
+    m.mart_clicks,
+    0
+  ) AS mart_clicks,
+
+  IFNULL(
+    s.staging_total_events,
+    0
+  ) AS staging_total_events,
+
+  IFNULL(
+    m.mart_total_events,
+    0
+  ) AS mart_total_events
+
+FROM staging AS s
+
+FULL OUTER JOIN mart AS m
+  USING (event_date)
+
+WHERE
+  IFNULL(s.staging_impressions, 0)
+    != IFNULL(m.mart_impressions, 0)
+
+  OR IFNULL(s.staging_clicks, 0)
+    != IFNULL(m.mart_clicks, 0)
+
+  OR IFNULL(s.staging_total_events, 0)
+    != IFNULL(m.mart_total_events, 0)
