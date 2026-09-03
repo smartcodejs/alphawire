@@ -8,7 +8,6 @@ config {
   bigquery: {
     partitionBy: "event_date",
     clusterBy: [
-      "event_name",
       "user_pseudo_id",
       "ga_session_id"
     ]
