@@ -10,16 +10,25 @@ WITH raw_ga4 AS (
     event_name,
     COUNT(*) AS raw_event_count
 
-  FROM `alphawire.analytics_491835993.events_*`
+  FROM
+    `alphawire.analytics_491835993.events_*`
 
-  WHERE _TABLE_SUFFIX NOT LIKE 'intraday%'
-    AND PARSE_DATE('%Y%m%d', event_date) >= DATE('2026-08-01')
+  WHERE
+    _TABLE_SUFFIX NOT LIKE 'intraday%'
+
+    AND PARSE_DATE(
+      '%Y%m%d',
+      event_date
+    ) >= DATE('2025-12-12')
+
     AND event_name IN (
       'banner_impression',
       'wisepops_popup_click'
     )
 
-  GROUP BY 1, 2
+  GROUP BY
+    event_date,
+    event_name
 ),
 
 dataform_stage AS (
@@ -29,24 +38,57 @@ dataform_stage AS (
     event_name,
     COUNT(*) AS staged_event_count
 
-  FROM ${ref("dataform", "stg_wisepops_ga4_events")}
+  FROM
+    ${ref("dataform", "stg_wisepops_ga4_events")}
 
-  WHERE event_date >= DATE('2026-08-01')
+  WHERE
+    event_date >= DATE('2025-12-12')
 
-  GROUP BY 1, 2
+  GROUP BY
+    event_date,
+    event_name
 )
 
 SELECT
-  COALESCE(r.event_date, s.event_date) AS event_date,
-  COALESCE(r.event_name, s.event_name) AS event_name,
-  IFNULL(r.raw_event_count, 0) AS raw_event_count,
-  IFNULL(s.staged_event_count, 0) AS staged_event_count,
-  IFNULL(r.raw_event_count, 0) - IFNULL(s.staged_event_count, 0) AS difference
 
-FROM raw_ga4 r
+  COALESCE(
+    r.event_date,
+    s.event_date
+  ) AS event_date,
 
-FULL OUTER JOIN dataform_stage s
-  USING (event_date, event_name)
+  COALESCE(
+    r.event_name,
+    s.event_name
+  ) AS event_name,
 
-WHERE IFNULL(r.raw_event_count, 0)
-      != IFNULL(s.staged_event_count, 0)
+  IFNULL(
+    r.raw_event_count,
+    0
+  ) AS raw_event_count,
+
+  IFNULL(
+    s.staged_event_count,
+    0
+  ) AS staged_event_count,
+
+  IFNULL(
+    r.raw_event_count,
+    0
+  ) - IFNULL(
+    s.staged_event_count,
+    0
+  ) AS difference
+
+FROM
+  raw_ga4 AS r
+
+FULL OUTER JOIN
+  dataform_stage AS s
+USING (
+  event_date,
+  event_name
+)
+
+WHERE
+  IFNULL(r.raw_event_count, 0)
+  != IFNULL(s.staged_event_count, 0)
