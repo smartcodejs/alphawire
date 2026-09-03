@@ -29,7 +29,7 @@ dataform_stage AS (
     event_name,
     COUNT(*) AS staged_event_count
 
-  FROM ${ref("stg_wisepops_ga4_events")}
+  FROM ${ref("dataform", "stg_wisepops_ga4_events")}
 
   WHERE event_date >= DATE('2026-08-01')
 
